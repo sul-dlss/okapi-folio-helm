@@ -1,0 +1,162 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "okapi.fullname" . }}
+  labels:
+    {{- include "okapi.labels" . | nindent 4 }}
+spec:
+{{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+{{- end }}
+  selector:
+    matchLabels:
+      {{- include "okapi.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+    {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      labels:
+        {{- include "okapi.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "okapi.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - {{ .Values.args }}
+            {{- if .Values.hazelcast.enabled }}
+            {{- range .Values.hazelcast.args }}
+            - {{ . | quote }}
+            {{- end }}
+            {{- end }}
+          {{- if .Values.readinessProbeEnabled}}
+          {{- if eq .Values.readinessProbeEnabled true }}
+          readinessProbe:
+            httpGet:
+              path: {{ if .Values.readinessProbe -}} {{ default "/admin/health" .Values.readinessProbe.path | quote }} {{- else -}} "/admin/health" {{- end }}
+              port: {{ .Values.service.containerPort }}
+            periodSeconds: {{ if .Values.readinessProbe -}} {{ default 90 .Values.readinessProbe.periodSeconds }} {{- else -}} 90 {{- end }}
+
+            failureThreshold: {{ if .Values.readinessProbe -}} {{ default 30 .Values.readinessProbe.failureThreshold }} {{- else -}} 30 {{- end }}
+            timeoutSeconds: {{ if .Values.readinessProbe -}} {{ default 30 .Values.readinessProbe.timeoutSeconds }} {{- else -}} 30 {{- end }}
+          {{- end }}
+          {{- end }}
+          {{- if .Values.startupProbeEnabled}}
+          {{- if eq .Values.startupProbeEnabled true }}
+          startupProbe:
+            httpGet:
+              path: {{ if .Values.startupProbe -}} {{ default "/admin/health" .Values.startupProbe.path | quote }} {{- else -}} "/admin/health" {{- end }}
+              port: {{ .Values.service.containerPort }}
+            periodSeconds: {{ if .Values.startupProbe -}} {{ default 90 .Values.startupProbe.periodSeconds }} {{- else -}} 90 {{- end }}
+            initialDelaySeconds: {{ if .Values.startupProbe.initialDelaySeconds -}} {{ default 5 .Values.startupProbe.initialDelaySeconds }} {{- else -}} 5 {{- end }}
+            failureThreshold: {{ if .Values.startupProbe -}} {{ default 30 .Values.startupProbe.failureThreshold }} {{- else -}} 30 {{- end }}
+            timeoutSeconds: {{ if .Values.startupProbe -}} {{ default 30 .Values.startupProbe.timeoutSeconds }} {{- else -}} 30 {{- end }}
+          {{- end }}
+          {{- end }}
+          {{- if .Values.livenessProbeEnabled}}
+          {{- if eq .Values.livenessProbeEnabled true }}
+          livenessProbe:
+            httpGet:
+              path: {{ if .Values.livenessProbe -}} {{ default "/admin/health" .Values.livenessProbe.path | quote }} {{- else -}} "/admin/health" {{- end }}
+              port: {{ .Values.service.containerPort }}
+            periodSeconds: {{ if .Values.livenessProbe -}} {{ default 90 .Values.livenessProbe.periodSeconds }} {{- else -}} 90 {{- end }}
+            failureThreshold: {{ if .Values.livenessProbe -}} {{ default 30 .Values.livenessProbe.failureThreshold }} {{- else -}} 30 {{- end }}
+            timeoutSeconds: {{ if .Values.livenessProbe -}} {{ default 30 .Values.livenessProbe.timeoutSeconds }} {{- else -}} 30 {{- end }}
+          {{- end }}
+          {{- end }}
+          env:
+            - name: OKAPI_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: OKAPI_POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: OKAPI_DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: db-connect-modules
+                  key: DB_HOST
+            - name: OKAPI_DB_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: db-connect-modules
+                  key: DB_PORT
+            - name: OKAPI_DB
+              valueFrom:
+                secretKeyRef:
+                  name: db-connect-modules
+                  key: DB_DATABASE
+            - name: OKAPI_DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: db-connect-modules
+                  key: DB_USERNAME
+            - name: OKAPI_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-connect-modules
+                  key: password
+            - name: ENV
+              valueFrom:
+                secretKeyRef:
+                  key: ENV
+                  name: db-connect-modules
+            - name: JAVA_OPTIONS
+              {{- if .Values.hazelcast.enabled }}
+              value: {{ cat .Values.javaOptions .Values.hazelcast.javaOptions | quote }}
+              {{- else }}
+              value: {{ .Values.javaOptions | quote }}
+              {{- end }}
+          ports:
+            - name: http
+              containerPort: 9130
+              protocol: TCP
+          volumeMounts:
+          - name: "log4j2-xml"
+            readOnly: true
+            mountPath: "/etc/log4j2.xml"
+            subPath: "log4j2.xml"
+          {{- if .Values.hazelcast.enabled }}
+          - name: "hazelcast"
+            readOnly: true
+            mountPath: "/hazelcast/hazelcast.xml"
+            subPath: hazelcast.xml
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+      - name: "log4j2-xml"
+        configMap:
+          name: okapi-log4j2-configmap
+      {{- if .Values.hazelcast.enabled }}
+      - name: "hazelcast"
+        configMap:
+          defaultMode: 420
+          name: {{ include "okapi.fullname" . }}-hazelcast-configmap
+          optional: false
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
