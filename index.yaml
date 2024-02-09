@@ -1,0 +1,25 @@
+apiVersion: v1
+entries:
+  okapi:
+  - apiVersion: v2
+    appVersion: 4.01.0
+    created: "2024-02-09T10:18:01.925075-08:00"
+    description: A Helm chart OKAPI for Kubernetes
+    digest: 748835fb9df64d8c7bc9d3d4973d12389176bc03819da33cd5e00813042b39db
+    name: okapi
+    type: application
+    urls:
+    - https://sul-dlss.github.io/okapi-folio-helm/charts/okapi-0.3.31.tgz
+    version: 0.3.31
+  setae-api:
+  - apiVersion: v2
+    appVersion: 1.0.0
+    created: "2024-02-09T10:18:01.925716-08:00"
+    description: A Helm chart for Kubernetes
+    digest: eae65b4e3c66a5f34c139c3bbd2d6eaf08bd9a13a1811f23ae5cce1f62166bd5
+    name: setae-api
+    type: application
+    urls:
+    - https://sul-dlss.github.io/okapi-folio-helm/charts/setae-api-1.0.0.tgz
+    version: 1.0.0
+generated: "2024-02-09T10:18:01.923952-08:00"
