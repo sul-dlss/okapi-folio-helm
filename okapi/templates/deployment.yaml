@@ -108,7 +108,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: db-connect-modules
-                  key: password
+                  key: DB_PASSWORD
             - name: ENV
               valueFrom:
                 secretKeyRef:
